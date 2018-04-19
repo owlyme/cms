@@ -23,7 +23,7 @@ config.init = function() {
 	this.creatAndReadFile( config.dataListFile, {List: []}, (data) => {
 		if(data){
 			log(`List file content ${data}`);
-			config.ListContent  = JSON.parse( data );
+			config.ListContent  = JSON.parse( data ) || {List: []};
 			log( config.ListContent );
 		} else {
 			config.ListContent  = [];
@@ -73,22 +73,26 @@ config.createFile = function(filePath, defaultConent, callback) {
 		};
 	});	
 };
-config.deletFile = function(filePath, callback) {
-	log( filePath );
-	fs.unlink(path.join( config.dataBaseLib, filePath+'.json'), (err) => {
+config.deletFile = function(id, callback) {
+	log( id );
+	fs.unlink(path.join( config.dataBaseLib, id+'.json'), (err) => {
 	  if (err) throw err;
 	  callback()
 	});
+	// fs.unlinkSync(path.join( config.dataBaseLib, id+'.json'));
+	// callback();
+	
 };
 config.upgradeList = function(id) {
-	log(filePath);
+	log(id);
 	delete config.ListContent[id];
 	let idIndex = config.ListContent.List.indexOf( id );
-	if(idIndex === -1) config.ListContent.List.splice(idIndex,1);
 
-	fs.writeFile(filePath, config.ListContent, (err) => {
+	if(idIndex != -1) config.ListContent.List.splice(idIndex,1);
+	log('upgradeList', config.ListContent);
+	fs.writeFile(config.dataListFile, JSON.stringify(config.ListContent), (err) => {
 		if( err ) throw err;
-		console.log(`created file ${filePath}`);
+		console.log(`created file ${id}`);
 	})
 };
 config.template = function(args) {
@@ -115,10 +119,8 @@ config.template = function(args) {
 	};
 	return html;
 };
-
 config.init();
 
-//settng router ---------------------------------------------------------
 app.use( bodyParser.json({limit: '5mb'}));
 app.use( bodyParser.urlencoded({limit: '5mb', extended: true}) );
 // app.use( express.static( config.staticPath) );
@@ -154,7 +156,25 @@ app.post('/manager',(req, res) => {
 	});	
 	return;
 });
-
+app.post('/modify',(req, res) => {
+	let body = req.body;
+	if ( !body.title ) {
+		res.send('title cannot be null');
+		return;
+	}
+	if ( !body.content ) {
+		res.send('content cannot be null');
+		return;
+	}
+	if ( !body.id ) {
+		res.send('id cannot be null');
+		return;
+	}
+	let filePath = path.join( config.dataBaseLib, body.id+'.json');
+	config.createFile(filePath, body, ()=> {
+		res.send('modify success！');
+	});
+});
 //get data list 
 app.get('/list', (req, res) =>{
 	res.send( JSON.stringify( config.ListContent.List) )
@@ -162,8 +182,14 @@ app.get('/list', (req, res) =>{
 //create article
 app.post('/new', (req, res) => {
 	let body = req.body;
-	if ( !body.title ) res.send('title cannot be null');
-	if ( !body.content ) res.send('content cannot be null');
+	if ( !body.title ) {
+		res.send('title cannot be null');
+		return;
+	}
+	if ( !body.content ) {
+		res.send('content cannot be null');
+		return;
+	}
 	const _timestamp = Date.now();
 
 	if( !config.ListContent[_timestamp] ){
@@ -178,6 +204,7 @@ app.post('/new', (req, res) => {
 			res.send('save success！');
 		});
 	});
+	return;
 });
 // delete artile 
 app.post('/delete', (req, res) => {
@@ -187,6 +214,8 @@ app.post('/delete', (req, res) => {
 		res.send('Deleted successfully!');
 		console.log('deleted successfully');
 	});
+	config.upgradeList(id);
+	return;
 });
 // get article file
 app.get("/:id",(req, res) => {
@@ -197,7 +226,7 @@ app.get("/:id",(req, res) => {
 
 	fs.stat(article, (err) => {
 		if (err) {
-			res.redirect("/");
+			return res.redirect("/");
 			console.log(`${article} does not exist.`);
 		} else {
 			fs.readFile(article,'utf-8', (err, data) => {
@@ -212,6 +241,7 @@ app.get("/:id",(req, res) => {
 			});
 		};
 	});	
+	return;
 });
 
 // 定制404 页面

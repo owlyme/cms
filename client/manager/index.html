@@ -9,6 +9,14 @@
     <link href="http://netdna.bootstrapcdn.com/font-awesome/3.0.2/css/font-awesome.css" rel="stylesheet">
     <link href="http://mindmup.github.io/bootstrap-wysiwyg/index.css" rel="stylesheet">
 	<style type="text/css">
+		.editor-container{
+			position: absolute;
+			display: none;
+			width: 100%;
+			left: 0px;
+			top : 0px;
+			background: #eee;
+		}
 		#editor {overflow:scroll; min-height:300px}
 	</style>
 </head>
@@ -17,11 +25,13 @@
 	<div class="container">
 	  <div class="row">
 	    <div class="col-md-3 col-sm-3">
-	    	<ul class="list-group">
-			  <li class="list-group-item">Vestibulum at eros</li>
-			</ul>
+	    	<ul class="list-group"></ul>
 	    </div>
   		<div class="col-md-9 col-sm-9">
+  			<div class="btn-group" role="group">
+			    <button type="button" class="btn btn-default create-article">add new</button>
+			    <button type="button" class="btn btn-default modify-article">modify</button>
+			</div>
   			<div id="article-container">
 				<h2>Hello owly!</h2>
 				<div>Whating are gonging to do ...</div>
@@ -29,10 +39,9 @@
   		</div>
 	  </div>
 	</div>
-	<div class="container">
+	<div class="container editor-container" >
 	  <div class="row">
-	  	<!-- method="POST" action="/new" -->
-	  	<form name="article" >
+	  	<!-- <form name="article" > -->
 	  		<div class="form-group">
 			    <input type="text"  name="title" class="form-control title" placeholder="Please title!" aria-describedby="sizing-addon1">
 			</div>
@@ -94,12 +103,14 @@
 				    <div id="editor" contenteditable="true">
 				      Go ahead…</div>
 					</div>
+					<div class="btn-group" role="group">
+						<button id="save-article" class="btn btn-default"> save </button>
+
+						<button id="close-article" class="btn btn-default"> close </button>
+					</div>
 				<!-- bootstrap-wysiwyg END -->
-			</div>	  	
-			<div class="btn-group" role="group">
-			    <button type="button" class="btn btn-default create-new">add new</button>
 			</div>
-		</form >
+		<!-- </form > -->
 	   </div>
 	</div>
 
@@ -113,6 +124,8 @@
 		$(document).ready(function(){
 			(function() {
 				var Manager = {
+					status			: 0, // 0 => 'create', 1 => 'modify'
+					articleId		: null,
 					getArticle      :   function(id) {
 											axios.post('/manager', {id : id.toString()})
 												.then(function (res) {
@@ -135,6 +148,15 @@
 										},
 					deleteArtile	:   function(id) {
 											axios.post("/delete", {id: id})
+												.then(function (res) {
+												    console.log(res.data);
+												})
+												.catch(function (error) {
+													console.log(error);
+											});
+										},
+					modifyArticle  :   function(args) {
+											axios.post("/modify", args)
 												.then(function (res) {
 												    console.log(res.data);
 												})
@@ -167,6 +189,7 @@
 				
 				$('.list-group').on("click", '.list-group-item',function(){
 					var id = $(this).data().id;
+					Manager.articleId = id;
 					Manager.getArticle(id);
 				});
 
@@ -178,12 +201,37 @@
 
 				});
 
-				$('.create-new').on("click", function() {				
-					Manager.createNewArticle({
-						title: $(".title").val(),
-						content: $('#editor').html()
-					});
+				$('#save-article').on("click", function() {	
+					if( !Manager.status){
+						Manager.createNewArticle({
+							title: $(".title").val(),
+							content: $('#editor').html()
+						});						
+					} else if (Manager.status)	{
+						Manager.modifyArticle({
+							id: Manager.articleId,
+							title: $(".title").val(),
+							content: $('#editor').html()
+						});
+					}
+					$('#editor').html('Go ahead…')
+					$('.editor-container').hide();
 				});
+				$('#close-article').on('click',function(){
+					$('.editor-container').hide();
+				})
+
+				$('.create-article').on("click", function() {
+					Manager.status = 0;		
+					$('.editor-container').show();
+				});
+
+				$('.modify-article').on('click',function(){
+					Manager.status = 1;
+					$('.editor-container').show();
+					$(".title").val( $('#article-container h2').text() );
+					$('#editor').html( $('#article-container div').html());
+				})
 
 			})();
 
